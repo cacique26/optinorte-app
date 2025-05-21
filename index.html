@@ -222,6 +222,10 @@
                     Agregar Historia Clínica
                 </button>
 
+                <button id="download-daily-patients-btn" class="bg-blue-500 text-white py-3 px-5 rounded-xl font-semibold text-left shadow-md hover:bg-blue-600 transition-colors duration-200">
+                    Descargar Pacientes del Día
+                </button>
+
                 <div class="search-box flex border border-gray-300 rounded-xl overflow-hidden bg-white shadow-sm">
                     <input type="text" id="search-input" placeholder="Buscar" class="flex-grow p-3 outline-none text-darkGray text-sm">
                     <button class="p-3 bg-white hover:bg-gray-50 transition-colors duration-200">
@@ -476,6 +480,7 @@
             const noPatientSelectedMessage = document.getElementById('no-patient-selected-message');
             const searchInput = document.getElementById('search-input');
             const addHistoryBtn = document.getElementById('add-history-btn');
+            const downloadDailyPatientsBtn = document.getElementById('download-daily-patients-btn'); // Nuevo botón
             const addPatientModal = document.getElementById('add-patient-modal');
             const addPatientForm = document.getElementById('add-patient-form');
             const cancelAddPatientBtn = document.getElementById('cancel-add-patient');
@@ -542,6 +547,53 @@
                 document.getElementById('new-od-av').value = '1.0';
             }
 
+            // Función para formatear la fecha actual a YYYY-MM-DD
+            function getTodayDateString() {
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0'); // Meses son 0-indexados
+                const day = String(today.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+
+            // Función para convertir un array de objetos a formato CSV
+            function convertToCSV(data) {
+                if (data.length === 0) return '';
+
+                const headers = Object.keys(data[0]);
+                const csvRows = [];
+
+                // Añadir encabezados
+                csvRows.push(headers.join(','));
+
+                // Añadir filas de datos
+                for (const row of data) {
+                    const values = headers.map(header => {
+                        const escaped = ('' + row[header]).replace(/"/g, '""'); // Escapar comillas dobles
+                        return `"${escaped}"`; // Envolver valores en comillas dobles
+                    });
+                    csvRows.push(values.join(','));
+                }
+
+                return csvRows.join('\n');
+            }
+
+            // Función para descargar un archivo CSV
+            function downloadCSV(csvString, filename) {
+                const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                if (link.download !== undefined) { // Feature detection
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', filename);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            }
+
+
             // --- Funciones de Supabase (CRUD) ---
 
             // Función para obtener pacientes de Supabase
@@ -567,6 +619,36 @@
                     hideLoading();
                 }
             }
+
+            // Función para obtener pacientes del día actual para descarga
+            async function fetchDailyPatientsForDownload() {
+                showLoading();
+                try {
+                    const todayDate = getTodayDateString();
+                    // Filtra por fechaIngreso igual a la fecha actual
+                    const { data, error } = await supabaseClient
+                        .from('pacientes')
+                        .select('*')
+                        .eq('fechaIngreso', todayDate)
+                        .order('nombre', { ascending: true });
+
+                    if (error) throw error;
+
+                    if (data.length > 0) {
+                        const csv = convertToCSV(data);
+                        const filename = `pacientes_dia_${todayDate}.csv`;
+                        downloadCSV(csv, filename);
+                    } else {
+                        alert('No hay pacientes ingresados hoy para descargar.'); // Usar una alerta simple para este caso
+                    }
+                } catch (error) {
+                    console.error('Error al descargar pacientes del día:', error.message);
+                    alert('Hubo un error al intentar descargar los pacientes del día.'); // Usar una alerta simple
+                } finally {
+                    hideLoading();
+                }
+            }
+
 
             // Función para agregar un nuevo paciente
             async function addPatient(patientData) {
@@ -786,6 +868,9 @@
                 resetAddPatientForm();
                 showModal(addPatientModal);
             });
+
+            // Event listener para el nuevo botón de descarga
+            downloadDailyPatientsBtn.addEventListener('click', fetchDailyPatientsForDownload);
 
             cancelAddPatientBtn.addEventListener('click', () => {
                 hideModal(addPatientModal);
