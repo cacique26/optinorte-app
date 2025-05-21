@@ -322,6 +322,26 @@
                         </div>
                     </div>
 
+                    <div class="vision-details w-full border-t border-gray-200 pt-6 mt-4 grid grid-cols-2 gap-4">
+                        <h3 class="text-primary font-semibold text-lg text-center col-span-1">Adición Ojo Izquierdo</h3>
+                        <h3 class="text-primary font-semibold text-lg text-center col-span-1">Adición Ojo Derecho</h3>
+                        <div class="vision-details-row grid grid-cols-2 gap-4 col-span-2">
+                            <div class="flex items-center gap-2">
+                                <label class="text-gray-600 text-sm w-20 text-right">Adición</label>
+                                <input type="text" id="adicion-oi" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm flex-grow outline-none">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-gray-600 text-sm w-20 text-right">Adición</label>
+                                <input type="text" id="adicion-od" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm flex-grow outline-none">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="input-group flex flex-col mt-4">
+                        <label class="text-gray-600 text-sm mb-1">Precio Consulta</label>
+                        <input type="text" id="precio-consulta" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm outline-none">
+                    </div>
+
                     <div class="observations w-full flex flex-col mt-4">
                         <label class="text-gray-600 text-sm mb-1">Observaciones</label>
                         <textarea id="observaciones" readonly class="border border-gray-300 p-3 rounded-lg bg-gray-100 text-darkGray text-sm h-28 resize-y outline-none"></textarea>
@@ -425,6 +445,21 @@
                 <div class="input-group flex flex-col">
                     <label for="new-od-av" class="text-gray-600 text-sm mb-1">OD AV</label>
                     <input type="text" id="new-od-av" value="1.0" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="col-span-full border-t border-gray-200 pt-4 mt-4">
+                    <h3 class="text-primary font-semibold text-lg mb-4 text-center">Datos de Adición y Consulta</h3>
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-adicion-oi" class="text-gray-600 text-sm mb-1">Adición Ojo Izquierdo</label>
+                    <input type="text" id="new-adicion-oi" value="" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-adicion-od" class="text-gray-600 text-sm mb-1">Adición Ojo Derecho</label>
+                    <input type="text" id="new-adicion-od" value="" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col col-span-full">
+                    <label for="new-precio-consulta" class="text-gray-600 text-sm mb-1">Precio Consulta</label>
+                    <input type="text" id="new-precio-consulta" value="" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
                 </div>
                 <div class="input-group flex flex-col col-span-full">
                     <label for="new-observaciones" class="text-gray-600 text-sm mb-1">Observaciones</label>
@@ -545,6 +580,10 @@
                 document.getElementById('new-od-eje').value = '0';
                 document.getElementById('new-oi-av').value = '1.0';
                 document.getElementById('new-od-av').value = '1.0';
+                // Nuevos campos
+                document.getElementById('new-adicion-oi').value = '';
+                document.getElementById('new-adicion-od').value = '';
+                document.getElementById('new-precio-consulta').value = '';
             }
 
             // Función para formatear la fecha actual a YYYY-MM-DD
@@ -778,6 +817,12 @@
                 document.getElementById('oi-av').value = patient.oi_av !== undefined ? patient.oi_av : '';
                 document.getElementById('od-av').value = patient.od_av !== undefined ? patient.od_av : '';
 
+                // Nuevos campos
+                document.getElementById('adicion-oi').value = patient.adicion_oi !== undefined ? patient.adicion_oi : '';
+                document.getElementById('adicion-od').value = patient.adicion_od !== undefined ? patient.adicion_od : '';
+                document.getElementById('precio-consulta').value = patient.precio_consulta !== undefined ? patient.precio_consulta : '';
+
+
                 document.getElementById('observaciones').value = patient.observaciones || '';
 
                 currentSelectedPatientId = patient.id;
@@ -899,6 +944,10 @@
                     od_eje: document.getElementById('new-od-eje').value,
                     oi_av: document.getElementById('new-oi-av').value,
                     od_av: document.getElementById('new-od-av').value,
+                    // Nuevos campos
+                    adicion_oi: document.getElementById('new-adicion-oi').value,
+                    adicion_od: document.getElementById('new-adicion-od').value,
+                    precio_consulta: document.getElementById('new-precio-consulta').value,
                     observaciones: document.getElementById('new-observaciones').value,
                 };
                 await addPatient(newPatientData);
@@ -948,6 +997,10 @@
                         od_eje: document.getElementById('od-eje').value,
                         oi_av: document.getElementById('oi-av').value,
                         od_av: document.getElementById('od-av').value,
+                        // Nuevos campos
+                        adicion_oi: document.getElementById('adicion-oi').value,
+                        adicion_od: document.getElementById('adicion-od').value,
+                        precio_consulta: document.getElementById('precio-consulta').value,
                         observaciones: document.getElementById('observaciones').value,
                     };
                     await updatePatient(currentSelectedPatientId, updatedPatientData);
