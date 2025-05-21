@@ -799,7 +799,8 @@
                     cedula: document.getElementById('new-cedula').value,
                     direccion: document.getElementById('new-direccion').value,
                     telefono: document.getElementById('new-telefono').value,
-                    fechaIngreso: document.getElementById('new-fechaIngreso').value,
+                    // Si la fecha de ingreso está vacía, envía null en lugar de una cadena vacía
+                    fechaIngreso: document.getElementById('new-fechaIngreso').value || null,
                     edad: parseInt(document.getElementById('new-edad').value) || null,
                     genero: document.getElementById('new-genero').value,
                     oi_esferico: document.getElementById('new-oi-esferico').value,
@@ -844,7 +845,8 @@
                         cedula: document.getElementById('cedula').value,
                         direccion: document.getElementById('direccion').value,
                         telefono: document.getElementById('telefono').value,
-                        fechaIngreso: document.getElementById('fechaIngreso').value,
+                        // Si la fecha de ingreso está vacía, envía null en lugar de una cadena vacía
+                        fechaIngreso: document.getElementById('fechaIngreso').value || null,
                         edad: parseInt(document.getElementById('edad').value) || null,
                         genero: document.getElementById('genero').value,
                         oi_esferico: document.getElementById('oi-esferico').value,
