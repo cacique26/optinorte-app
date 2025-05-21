@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optinorte - Gestión de Pacientes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#007bff', // Azul para elementos principales
+                        secondary: '#ff9800', // Naranja para botones de acción
+                        lightGray: '#f8f9fa', // Gris claro para fondos
+                        mediumGray: '#e9ecef', // Gris medio para tarjetas
+                        darkGray: '#333', // Gris oscuro para texto
+                        borderGray: '#e0e0e0', // Gris para bordes
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Importar fuente Inter */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: #f0f2f5; /* Fondo general más suave */
+        }
+
+        /* Estilos para el icono de búsqueda SVG */
+        .search-icon {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        /* Estilo para el scrollbar */
+        .patient-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .patient-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .patient-list::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+
+        .patient-list::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Estilos para el modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh; /* Limita la altura del modal al 90% del viewport */
+            overflow-y: auto; /* Permite desplazamiento vertical si el contenido excede la altura */
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.show .modal-content {
+            transform: translateY(0);
+        }
+
+        /* Estilos para el mensaje de confirmación */
+        .confirm-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1001; /* Mayor que el modal de agregar */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .confirm-modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .confirm-modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+
+        .confirm-modal-overlay.show .confirm-modal-content {
+            transform: translateY(0);
+        }
+
+        /* Estilos para el mensaje de carga */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000; /* Asegura que esté por encima de todo */
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0s, opacity 0.3s linear;
+        }
+
+        .loading-overlay.show {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .loading-spinner {
+            border: 8px solid #f3f3f3; /* Light grey */
+            border-top: 8px solid #007bff; /* Blue */
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4 md:p-8 bg-lightGray">
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div id="login-section" class="fixed inset-0 bg-gray-100 flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-xl shadow-xl w-96 text-center">
+            <h2 class="text-3xl font-bold text-primary mb-6">Iniciar Sesión</h2>
+            <form id="login-form" class="flex flex-col gap-4">
+                <input type="text" id="username-input" placeholder="Usuario" class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-primary">
+                <input type="password" id="password-input" placeholder="Contraseña" class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-primary">
+                <p id="login-error-message" class="text-red-500 text-sm hidden">Usuario o contraseña incorrectos.</p>
+                <button type="submit" class="bg-primary text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200">
+                    Acceder
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="main-app-container" class="hidden relative w-full h-full">
+        <div class="container bg-white rounded-xl shadow-xl w-full max-w-6xl flex flex-col lg:flex-row overflow-hidden">
+            <header class="lg:hidden p-4 bg-white border-b border-gray-200 flex items-center justify-center">
+                <div class="logo flex items-center justify-center">
+                    <svg class="w-12 h-12 text-primary mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                    </svg>
+                    <h1 class="text-3xl font-bold text-primary">OPTINORTE</h1>
+                </div>
+            </header>
+
+            <aside class="sidebar w-full lg:w-80 p-6 bg-lightGray border-r border-gray-200 flex flex-col gap-4">
+                <header class="hidden lg:flex items-center justify-center mb-4">
+                    <div class="logo flex items-center justify-center">
+                        <svg class="w-12 h-12 text-primary mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                        </svg>
+                        <h1 class="text-3xl font-bold text-primary">OPTINORTE</h1>
+                    </div>
+                </header>
+
+                <button id="add-history-btn" class="add-history-btn bg-secondary text-white py-3 px-5 rounded-xl font-semibold text-left shadow-md hover:bg-orange-600 transition-colors duration-200">
+                    Agregar Historia Clínica
+                </button>
+
+                <div class="search-box flex border border-gray-300 rounded-xl overflow-hidden bg-white shadow-sm">
+                    <input type="text" id="search-input" placeholder="Buscar" class="flex-grow p-3 outline-none text-darkGray text-sm">
+                    <button class="p-3 bg-white hover:bg-gray-50 transition-colors duration-200">
+                        <svg class="search-icon text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div id="patient-list" class="patient-list flex flex-col gap-3 overflow-y-auto max-h-[calc(100vh-250px)] lg:max-h-[calc(100vh-280px)]">
+                    <p id="no-patients-message" class="text-gray-500 text-center mt-4">No hay pacientes registrados.</p>
+                </div>
+            </aside>
+
+            <section class="patient-details flex-grow p-6 md:p-8 flex flex-col gap-6">
+                <div id="patient-details-content" class="hidden">
+                    <div class="details-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                        <div class="input-group flex flex-col">
+                            <label class="text-gray-600 text-sm mb-1">Nombre</label>
+                            <input type="text" id="nombre" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm outline-none">
+                        </div>
+                        <div class="input-group flex flex-col">
+                            <label class="text-gray-600 text-sm mb-1">Cédula</label>
+                            <input type="text" id="cedula" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm outline-none">
+                        </div>
+                        <div class="input-group flex flex-col">
+                            <label class="text-gray-600 text-sm mb-1">Dirección</label>
+                            <input type="text" id="direccion" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm outline-none">
+                        </div>
+                        <div class="input-group flex flex-col">
+                            <label class="text-gray-600 text-sm mb-1">Teléfono</label>
+                            <input type="text" id="telefono" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm outline-none">
+                        </div>
+                        <div class="input-group flex flex-col">
+                            <label class="text-gray-600 text-sm mb-1">Fecha de ingreso</label>
+                            <input type="text" id="fechaIngreso" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm outline-none">
+                        </div>
+                        <div class="input-group flex flex-col">
+                            <label class="text-gray-600 text-sm mb-1">Edad</label>
+                            <input type="text" id="edad" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm outline-none">
+                        </div>
+                        <div class="input-group flex flex-col">
+                            <label class="text-gray-600 text-sm mb-1">Género</label>
+                            <input type="text" id="genero" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm outline-none">
+                        </div>
+                    </div>
+
+                    <div class="vision-details w-full border-t border-gray-200 pt-6 mt-4 grid grid-cols-2 gap-4">
+                        <h3 class="text-primary font-semibold text-lg text-center col-span-1">Ojo Izquierdo</h3>
+                        <h3 class="text-primary font-semibold text-lg text-center col-span-1">Ojo Derecho</h3>
+
+                        <div class="vision-details-row grid grid-cols-2 gap-4 col-span-2">
+                            <div class="flex items-center gap-2">
+                                <label class="text-gray-600 text-sm w-20 text-right">Esférico</label>
+                                <input type="text" id="oi-esferico" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm flex-grow outline-none">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-gray-600 text-sm w-20 text-right">Esférico</label>
+                                <input type="text" id="od-esferico" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm flex-grow outline-none">
+                            </div>
+                        </div>
+
+                        <div class="vision-details-row grid grid-cols-2 gap-4 col-span-2">
+                            <div class="flex items-center gap-2">
+                                <label class="text-gray-600 text-sm w-20 text-right">Cilíndrico</label>
+                                <input type="text" id="oi-cilindrico" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm flex-grow outline-none">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-gray-600 text-sm w-20 text-right">Cilíndrico</label>
+                                <input type="text" id="od-cilindrico" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm flex-grow outline-none">
+                            </div>
+                        </div>
+
+                        <div class="vision-details-row grid grid-cols-2 gap-4 col-span-2">
+                            <div class="flex items-center gap-2">
+                                <label class="text-gray-600 text-sm w-20 text-right">Eje</label>
+                                <input type="text" id="oi-eje" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm flex-grow outline-none">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-gray-600 text-sm w-20 text-right">Eje</label>
+                                <input type="text" id="od-eje" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm flex-grow outline-none">
+                            </div>
+                        </div>
+
+                        <div class="vision-details-row grid grid-cols-2 gap-4 col-span-2">
+                            <div class="flex items-center gap-2">
+                                <label class="text-gray-600 text-sm w-20 text-right">AV</label>
+                                <input type="text" id="oi-av" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm flex-grow outline-none">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-gray-600 text-sm w-20 text-right">AV</label>
+                                <input type="text" id="od-av" value="" readonly class="border border-gray-300 p-2 rounded-lg bg-gray-100 text-darkGray text-sm flex-grow outline-none">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="observations w-full flex flex-col mt-4">
+                        <label class="text-gray-600 text-sm mb-1">Observaciones</label>
+                        <textarea id="observaciones" readonly class="border border-gray-300 p-3 rounded-lg bg-gray-100 text-darkGray text-sm h-28 resize-y outline-none"></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-4 mt-6">
+                        <button id="edit-patient-btn" class="bg-primary text-white py-2 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200">
+                            Editar Datos
+                        </button>
+                        <button id="delete-patient-btn" class="bg-red-500 text-white py-2 px-6 rounded-lg font-semibold hover:bg-red-600 transition-colors duration-200">
+                            Eliminar Paciente
+                        </button>
+                        <button id="save-edit-btn" class="bg-green-500 text-white py-2 px-6 rounded-lg font-semibold hover:bg-green-600 transition-colors duration-200 hidden">
+                            Guardar Cambios
+                        </button>
+                        <button id="cancel-edit-btn" class="bg-gray-300 text-darkGray py-2 px-6 rounded-lg font-semibold hover:bg-gray-400 transition-colors duration-200 hidden">
+                            Cancelar Edición
+                        </button>
+                    </div>
+                </div>
+                <div id="no-patient-selected-message" class="flex flex-col items-center justify-center h-full text-gray-500 text-lg text-center p-8">
+                    <svg class="w-24 h-24 mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                    </svg>
+                    <p>Selecciona un paciente de la lista o haz clic en "Agregar Historia Clínica" para empezar.</p>
+                </div>
+            </section>
+        </div>
+        <button id="logout-btn" class="absolute top-4 right-4 bg-red-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-600 transition-colors duration-200 text-sm z-50">Salir</button>
+        <div id="user-id-display" class="absolute bottom-4 left-4 text-gray-600 text-xs"></div>
+    </div>
+
+    <div id="add-patient-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 class="text-2xl font-bold text-primary mb-6 text-center">Agregar Nueva Historia Clínica</h2>
+            <form id="add-patient-form" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pb-8">
+                <div class="input-group flex flex-col">
+                    <label for="new-nombre" class="text-gray-600 text-sm mb-1">Nombre</label>
+                    <input type="text" id="new-nombre" required class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-cedula" class="text-gray-600 text-sm mb-1">Cédula</label>
+                    <input type="text" id="new-cedula" required class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-direccion" class="text-gray-600 text-sm mb-1">Dirección</label>
+                    <input type="text" id="new-direccion" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-telefono" class="text-gray-600 text-sm mb-1">Teléfono</label>
+                    <input type="text" id="new-telefono" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-fechaIngreso" class="text-gray-600 text-sm mb-1">Fecha de ingreso</label>
+                    <input type="date" id="new-fechaIngreso" value="" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-edad" class="text-gray-600 text-sm mb-1">Edad</label>
+                    <input type="number" id="new-edad" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-genero" class="text-gray-600 text-sm mb-1">Género</label>
+                    <select id="new-genero" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                        <option value="">Seleccionar</option>
+                        <option value="Masculino">Masculino</option>
+                        <option value="Femenino">Femenino</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+                <div class="col-span-full border-t border-gray-200 pt-4 mt-4">
+                    <h3 class="text-primary font-semibold text-lg mb-4 text-center">Datos de Visión (Opcional)</h3>
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-oi-esferico" class="text-gray-600 text-sm mb-1">OI Esférico</label>
+                    <input type="text" id="new-oi-esferico" value="0.00" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-od-esferico" class="text-gray-600 text-sm mb-1">OD Esférico</label>
+                    <input type="text" id="new-od-esferico" value="0.00" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-oi-cilindrico" class="text-gray-600 text-sm mb-1">OI Cilíndrico</label>
+                    <input type="text" id="new-oi-cilindrico" value="0.00" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-od-cilindrico" class="text-gray-600 text-sm mb-1">OD Cilíndrico</label>
+                    <input type="text" id="new-od-cilindrico" value="0.00" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-oi-eje" class="text-gray-600 text-sm mb-1">OI Eje</label>
+                    <input type="text" id="new-oi-eje" value="0" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-od-eje" class="text-gray-600 text-sm mb-1">OD Eje</label>
+                    <input type="text" id="new-od-eje" value="0" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-oi-av" class="text-gray-600 text-sm mb-1">OI AV</label>
+                    <input type="text" id="new-oi-av" value="1.0" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col">
+                    <label for="new-od-av" class="text-gray-600 text-sm mb-1">OD AV</label>
+                    <input type="text" id="new-od-av" value="1.0" class="border border-gray-300 p-2 rounded-lg text-darkGray text-sm outline-none focus:border-primary">
+                </div>
+                <div class="input-group flex flex-col col-span-full">
+                    <label for="new-observaciones" class="text-gray-600 text-sm mb-1">Observaciones</label>
+                    <textarea id="new-observaciones" class="border border-gray-300 p-3 rounded-lg text-darkGray text-sm h-24 resize-y outline-none focus:border-primary"></textarea>
+                </div>
+
+                <div class="col-span-full flex justify-end gap-4 mt-6">
+                    <button type="button" id="cancel-add-patient" class="bg-gray-300 text-darkGray py-2 px-6 rounded-lg font-semibold hover:bg-gray-400 transition-colors duration-200">Cancelar</button>
+                    <button type="submit" class="bg-primary text-white py-2 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200">Guardar Paciente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="confirm-delete-modal" class="confirm-modal-overlay">
+        <div class="confirm-modal-content">
+            <h3 class="text-xl font-bold text-darkGray mb-4">Confirmar Eliminación</h3>
+            <p class="text-gray-700 mb-6">¿Estás seguro de que quieres eliminar a <span id="patient-name-to-delete" class="font-semibold"></span>?</p>
+            <div class="flex justify-center gap-4">
+                <button id="cancel-delete-btn" class="bg-gray-300 text-darkGray py-2 px-6 rounded-lg font-semibold hover:bg-gray-400 transition-colors duration-200">Cancelar</button>
+                <button id="confirm-delete-btn" class="bg-red-500 text-white py-2 px-6 rounded-lg font-semibold hover:bg-red-600 transition-colors duration-200">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Importar la función createClient de Supabase
+        const { createClient } = supabase;
+
+        // ** CONFIGURACIÓN DE SUPABASE **
+        // Reemplaza estos valores con tu Project URL y tu clave 'anon' de Supabase.
+        // Los encuentras en la consola de Supabase > Project Settings > API.
+        const SUPABASE_URL = 'https://ppndbzzzwhvoafzqxgbd.supabase.co'; // Tu Project URL
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwbmRienp6d2h2b2FmenF4Z2JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc3ODA5MjYsImV4cCI6MjA2MzM1NjkyNn0.NMLbuKhzYQKEGqAt2WmUXu2fvTelnrL2Wiz342D3Cd4'; // Tu clave 'anon'
+
+        // Inicializar Supabase Client
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Elementos de la interfaz de usuario
+            const loginSection = document.getElementById('login-section');
+            const mainAppContainer = document.getElementById('main-app-container');
+            const loginForm = document.getElementById('login-form');
+            const usernameInput = document.getElementById('username-input');
+            const passwordInput = document.getElementById('password-input');
+            const loginErrorMessage = document.getElementById('login-error-message');
+            const logoutBtn = document.getElementById('logout-btn');
+            const userIdDisplay = document.getElementById('user-id-display');
+
+            const patientListContainer = document.getElementById('patient-list');
+            const noPatientsMessage = document.getElementById('no-patients-message');
+            const patientDetailsContent = document.getElementById('patient-details-content');
+            const noPatientSelectedMessage = document.getElementById('no-patient-selected-message');
+            const searchInput = document.getElementById('search-input');
+            const addHistoryBtn = document.getElementById('add-history-btn');
+            const addPatientModal = document.getElementById('add-patient-modal');
+            const addPatientForm = document.getElementById('add-patient-form');
+            const cancelAddPatientBtn = document.getElementById('cancel-add-patient');
+
+            const editPatientBtn = document.getElementById('edit-patient-btn');
+            const deletePatientBtn = document.getElementById('delete-patient-btn');
+            const saveEditBtn = document.getElementById('save-edit-btn');
+            const cancelEditBtn = document.getElementById('cancel-edit-btn');
+
+            const confirmDeleteModal = document.getElementById('confirm-delete-modal');
+            const patientNameToDeleteSpan = document.getElementById('patient-name-to-delete');
+            const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+            const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+            const loadingOverlay = document.getElementById('loading-overlay');
+
+            let currentSelectedPatientId = null;
+            let isEditing = false;
+            let patientToDelete = null;
+
+            // --- Funciones de Utilidad ---
+            function showLoading() {
+                loadingOverlay.classList.add('show');
+            }
+
+            function hideLoading() {
+                loadingOverlay.classList.remove('show');
+            }
+
+            function showModal(modalElement) {
+                modalElement.classList.add('show');
+            }
+
+            function hideModal(modalElement) {
+                modalElement.classList.remove('show');
+            }
+
+            function setReadonly(isReadonly) {
+                const inputs = patientDetailsContent.querySelectorAll('input, textarea, select');
+                inputs.forEach(input => {
+                    input.readOnly = isReadonly;
+                    if (isReadonly) {
+                        input.classList.add('bg-gray-100');
+                        input.classList.remove('bg-white');
+                        input.classList.remove('focus:border-primary');
+                    } else {
+                        input.classList.remove('bg-gray-100');
+                        input.classList.add('bg-white');
+                        input.classList.add('focus:border-primary');
+                    }
+                });
+            }
+
+            function resetAddPatientForm() {
+                addPatientForm.reset();
+                // Establecer valores por defecto para los campos de visión
+                document.getElementById('new-oi-esferico').value = '0.00';
+                document.getElementById('new-od-esferico').value = '0.00';
+                document.getElementById('new-oi-cilindrico').value = '0.00';
+                document.getElementById('new-od-cilindrico').value = '0.00';
+                document.getElementById('new-oi-eje').value = '0';
+                document.getElementById('new-od-eje').value = '0';
+                document.getElementById('new-oi-av').value = '1.0';
+                document.getElementById('new-od-av').value = '1.0';
+            }
+
+            // --- Funciones de Supabase (CRUD) ---
+
+            // Función para obtener pacientes de Supabase
+            async function fetchPatients(searchTerm = '') {
+                showLoading();
+                try {
+                    let query = supabase.from('pacientes').select('*');
+
+                    if (searchTerm) {
+                        // Búsqueda por nombre o cédula (case-insensitive)
+                        query = query.or(`nombre.ilike.%${searchTerm}%,cedula.ilike.%${searchTerm}%`);
+                    }
+
+                    const { data, error } = await query.order('nombre', { ascending: true });
+
+                    if (error) throw error;
+
+                    displayPatients(data);
+                } catch (error) {
+                    console.error('Error al obtener pacientes:', error.message);
+                    // Aquí podrías mostrar un mensaje de error al usuario
+                } finally {
+                    hideLoading();
+                }
+            }
+
+            // Función para agregar un nuevo paciente
+            async function addPatient(patientData) {
+                showLoading();
+                try {
+                    const { data, error } = await supabase
+                        .from('pacientes')
+                        .insert([patientData])
+                        .select(); // Usar .select() para obtener los datos insertados
+
+                    if (error) throw error;
+
+                    console.log('Paciente agregado:', data);
+                    hideModal(addPatientModal);
+                    resetAddPatientForm();
+                    await fetchPatients(); // Recargar la lista de pacientes
+                    // Seleccionar el paciente recién agregado
+                    if (data && data.length > 0) {
+                        displayPatientDetails(data[0]);
+                        currentSelectedPatientId = data[0].id;
+                    }
+                } catch (error) {
+                    console.error('Error al agregar paciente:', error.message);
+                    // Aquí podrías mostrar un mensaje de error al usuario
+                } finally {
+                    hideLoading();
+                }
+            }
+
+            // Función para actualizar un paciente existente
+            async function updatePatient(id, updatedData) {
+                showLoading();
+                try {
+                    const { data, error } = await supabase
+                        .from('pacientes')
+                        .update(updatedData)
+                        .eq('id', id)
+                        .select();
+
+                    if (error) throw error;
+
+                    console.log('Paciente actualizado:', data);
+                    setReadonly(true);
+                    saveEditBtn.classList.add('hidden');
+                    cancelEditBtn.classList.add('hidden');
+                    editPatientBtn.classList.remove('hidden');
+                    deletePatientBtn.classList.remove('hidden');
+                    isEditing = false;
+                    await fetchPatients(); // Recargar la lista para reflejar los cambios
+                    if (data && data.length > 0) {
+                        displayPatientDetails(data[0]); // Mostrar los detalles actualizados
+                    }
+                } catch (error) {
+                    console.error('Error al actualizar paciente:', error.message);
+                    // Aquí podrías mostrar un mensaje de error al usuario
+                } finally {
+                    hideLoading();
+                }
+            }
+
+            // Función para eliminar un paciente
+            async function deletePatient(id) {
+                showLoading();
+                try {
+                    const { error } = await supabase
+                        .from('pacientes')
+                        .delete()
+                        .eq('id', id);
+
+                    if (error) throw error;
+
+                    console.log('Paciente eliminado:', id);
+                    hideModal(confirmDeleteModal);
+                    clearPatientDetails(); // Limpiar el panel de detalles
+                    await fetchPatients(); // Recargar la lista
+                } catch (error) {
+                    console.error('Error al eliminar paciente:', error.message);
+                    // Aquí podrías mostrar un mensaje de error al usuario
+                } finally {
+                    hideLoading();
+                }
+            }
+
+            // --- Funciones de Renderizado y UI ---
+
+            function displayPatients(patients) {
+                patientListContainer.innerHTML = ''; // Limpiar lista
+                if (patients.length === 0) {
+                    noPatientsMessage.classList.remove('hidden');
+                } else {
+                    noPatientsMessage.classList.add('hidden');
+                    patients.forEach(patient => {
+                        const patientCard = document.createElement('div');
+                        patientCard.className = 'patient-card p-4 bg-white rounded-lg shadow-sm cursor-pointer hover:bg-blue-50 transition-colors duration-200 border border-borderGray';
+                        patientCard.dataset.id = patient.id;
+                        patientCard.innerHTML = `
+                            <h3 class="font-semibold text-primary text-lg">${patient.nombre}</h3>
+                            <p class="text-gray-600 text-sm">Cédula: ${patient.cedula}</p>
+                        `;
+                        patientCard.addEventListener('click', () => {
+                            selectPatient(patient.id);
+                        });
+                        patientListContainer.appendChild(patientCard);
+                    });
+                }
+            }
+
+            function displayPatientDetails(patient) {
+                patientDetailsContent.classList.remove('hidden');
+                noPatientSelectedMessage.classList.add('hidden');
+
+                document.getElementById('nombre').value = patient.nombre || '';
+                document.getElementById('cedula').value = patient.cedula || '';
+                document.getElementById('direccion').value = patient.direccion || '';
+                document.getElementById('telefono').value = patient.telefono || '';
+                document.getElementById('fechaIngreso').value = patient.fechaIngreso || '';
+                document.getElementById('edad').value = patient.edad || '';
+                document.getElementById('genero').value = patient.genero || '';
+
+                // Datos de visión
+                document.getElementById('oi-esferico').value = patient.oi_esferico !== undefined ? patient.oi_esferico : '';
+                document.getElementById('od-esferico').value = patient.od_esferico !== undefined ? patient.od_esferico : '';
+                document.getElementById('oi-cilindrico').value = patient.oi_cilindrico !== undefined ? patient.oi_cilindrico : '';
+                document.getElementById('od-cilindrico').value = patient.od_cilindrico !== undefined ? patient.od_cilindrico : '';
+                document.getElementById('oi-eje').value = patient.oi_eje !== undefined ? patient.oi_eje : '';
+                document.getElementById('od-eje').value = patient.od_eje !== undefined ? patient.od_eje : '';
+                document.getElementById('oi-av').value = patient.oi_av !== undefined ? patient.oi_av : '';
+                document.getElementById('od-av').value = patient.od_av !== undefined ? patient.od_av : '';
+
+                document.getElementById('observaciones').value = patient.observaciones || '';
+
+                currentSelectedPatientId = patient.id;
+                setReadonly(true); // Siempre iniciar en modo de solo lectura
+                saveEditBtn.classList.add('hidden');
+                cancelEditBtn.classList.add('hidden');
+                editPatientBtn.classList.remove('hidden');
+                deletePatientBtn.classList.remove('hidden');
+
+                // Resaltar la tarjeta del paciente seleccionado
+                document.querySelectorAll('.patient-card').forEach(card => {
+                    card.classList.remove('bg-blue-100', 'border-primary');
+                });
+                const selectedCard = document.querySelector(`.patient-card[data-id="${patient.id}"]`);
+                if (selectedCard) {
+                    selectedCard.classList.add('bg-blue-100', 'border-primary');
+                }
+            }
+
+            function clearPatientDetails() {
+                patientDetailsContent.classList.add('hidden');
+                noPatientSelectedMessage.classList.remove('hidden');
+                currentSelectedPatientId = null;
+                // Quitar resaltado de todas las tarjetas
+                document.querySelectorAll('.patient-card').forEach(card => {
+                    card.classList.remove('bg-blue-100', 'border-primary');
+                });
+            }
+
+            async function selectPatient(patientId) {
+                showLoading();
+                try {
+                    const { data, error } = await supabase
+                        .from('pacientes')
+                        .select('*')
+                        .eq('id', patientId)
+                        .single(); // Usar .single() para obtener un solo registro
+
+                    if (error) throw error;
+
+                    displayPatientDetails(data);
+                } catch (error) {
+                    console.error('Error al seleccionar paciente:', error.message);
+                    // Podrías mostrar un mensaje de error si el paciente no se encuentra
+                    clearPatientDetails();
+                } finally {
+                    hideLoading();
+                }
+            }
+
+            // --- Manejadores de Eventos ---
+
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = usernameInput.value;
+                const password = passwordInput.value;
+
+                // Implementa tu lógica de autenticación aquí.
+                // Por simplicidad, usaremos credenciales fijas.
+                // En un entorno real, esto debería ir contra un servicio de autenticación seguro.
+                if (username === 'admin' && password === 'admin123') {
+                    loginSection.classList.add('hidden');
+                    mainAppContainer.classList.remove('hidden');
+                    userIdDisplay.textContent = `Usuario: admin`; // Muestra el usuario logueado
+                    await fetchPatients(); // Cargar pacientes al iniciar sesión
+                } else {
+                    loginErrorMessage.classList.remove('hidden');
+                }
+            });
+
+            logoutBtn.addEventListener('click', () => {
+                loginSection.classList.remove('hidden');
+                mainAppContainer.classList.add('hidden');
+                usernameInput.value = '';
+                passwordInput.value = '';
+                loginErrorMessage.classList.add('hidden');
+                clearPatientDetails();
+                patientListContainer.innerHTML = ''; // Limpiar lista de pacientes
+                noPatientsMessage.classList.remove('hidden');
+            });
+
+            searchInput.addEventListener('input', async (e) => {
+                const searchTerm = e.target.value.trim();
+                await fetchPatients(searchTerm);
+            });
+
+            addHistoryBtn.addEventListener('click', () => {
+                resetAddPatientForm();
+                showModal(addPatientModal);
+            });
+
+            cancelAddPatientBtn.addEventListener('click', () => {
+                hideModal(addPatientModal);
+            });
+
+            addPatientForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const newPatientData = {
+                    nombre: document.getElementById('new-nombre').value,
+                    cedula: document.getElementById('new-cedula').value,
+                    direccion: document.getElementById('new-direccion').value,
+                    telefono: document.getElementById('new-telefono').value,
+                    fechaIngreso: document.getElementById('new-fechaIngreso').value,
+                    edad: parseInt(document.getElementById('new-edad').value) || null,
+                    genero: document.getElementById('new-genero').value,
+                    oi_esferico: document.getElementById('new-oi-esferico').value,
+                    od_esferico: document.getElementById('new-od-esferico').value,
+                    oi_cilindrico: document.getElementById('new-oi-cilindrico').value,
+                    od_cilindrico: document.getElementById('new-od-cilindrico').value,
+                    oi_eje: document.getElementById('new-oi-eje').value,
+                    od_eje: document.getElementById('new-od-eje').value,
+                    oi_av: document.getElementById('new-oi-av').value,
+                    od_av: document.getElementById('new-od-av').value,
+                    observaciones: document.getElementById('new-observaciones').value,
+                };
+                await addPatient(newPatientData);
+            });
+
+            editPatientBtn.addEventListener('click', () => {
+                isEditing = true;
+                setReadonly(false);
+                editPatientBtn.classList.add('hidden');
+                deletePatientBtn.classList.add('hidden');
+                saveEditBtn.classList.remove('hidden');
+                cancelEditBtn.classList.remove('hidden');
+            });
+
+            cancelEditBtn.addEventListener('click', () => {
+                isEditing = false;
+                setReadonly(true);
+                saveEditBtn.classList.add('hidden');
+                cancelEditBtn.classList.add('hidden');
+                editPatientBtn.classList.remove('hidden');
+                deletePatientBtn.classList.remove('hidden');
+                // Recargar los detalles del paciente para descartar cambios no guardados
+                if (currentSelectedPatientId) {
+                    selectPatient(currentSelectedPatientId);
+                }
+            });
+
+            saveEditBtn.addEventListener('click', async () => {
+                if (currentSelectedPatientId) {
+                    const updatedPatientData = {
+                        nombre: document.getElementById('nombre').value,
+                        cedula: document.getElementById('cedula').value,
+                        direccion: document.getElementById('direccion').value,
+                        telefono: document.getElementById('telefono').value,
+                        fechaIngreso: document.getElementById('fechaIngreso').value,
+                        edad: parseInt(document.getElementById('edad').value) || null,
+                        genero: document.getElementById('genero').value,
+                        oi_esferico: document.getElementById('oi-esferico').value,
+                        od_esferico: document.getElementById('od-esferico').value,
+                        oi_cilindrico: document.getElementById('oi-cilindrico').value,
+                        od_cilindrico: document.getElementById('od-cilindrico').value,
+                        oi_eje: document.getElementById('oi-eje').value,
+                        od_eje: document.getElementById('od-eje').value,
+                        oi_av: document.getElementById('oi-av').value,
+                        od_av: document.getElementById('od-av').value,
+                        observaciones: document.getElementById('observaciones').value,
+                    };
+                    await updatePatient(currentSelectedPatientId, updatedPatientData);
+                }
+            });
+
+            deletePatientBtn.addEventListener('click', () => {
+                if (currentSelectedPatientId) {
+                    // Obtener el nombre del paciente para mostrar en la confirmación
+                    const patientName = document.getElementById('nombre').value;
+                    patientNameToDeleteSpan.textContent = patientName;
+                    patientToDelete = currentSelectedPatientId; // Guardar el ID del paciente a eliminar
+                    showModal(confirmDeleteModal);
+                }
+            });
+
+            cancelDeleteBtn.addEventListener('click', () => {
+                hideModal(confirmDeleteModal);
+                patientToDelete = null; // Limpiar el ID del paciente a eliminar
+            });
+
+            confirmDeleteBtn.addEventListener('click', async () => {
+                if (patientToDelete) {
+                    await deletePatient(patientToDelete);
+                    patientToDelete = null; // Limpiar el ID del paciente a eliminar
+                }
+            });
+
+            // Inicializar la aplicación mostrando la pantalla de login
+            loginSection.classList.remove('hidden');
+            mainAppContainer.classList.add('hidden');
+        });
+    </script>
+</body>
+</html>
