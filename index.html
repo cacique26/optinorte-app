@@ -455,16 +455,9 @@
 
         // Inicializar Supabase Client
         // NOTA: Se ha renombrado la variable a 'supabaseClient' para evitar conflictos
-        // y se ha añadido la configuración para deshabilitar el almacenamiento local
-        // debido a restricciones en entornos como iframes/Canvas.
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-            auth: {
-                storage: null, // Deshabilita el uso de localStorage para persistencia de sesión
-                autoRefreshToken: false, // Deshabilita la auto-actualización de tokens si no hay almacenamiento
-                persistSession: false, // No intenta persistir la sesión
-                detectSessionInUrl: false // No intenta detectar la sesión en la URL
-            }
-        });
+        // y se ha eliminado la configuración 'auth' para evitar problemas de almacenamiento local
+        // en entornos restrictivos como iframes/Canvas, ya que no se usa la autenticación de Supabase.
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         document.addEventListener('DOMContentLoaded', () => {
             // Elementos de la interfaz de usuario
