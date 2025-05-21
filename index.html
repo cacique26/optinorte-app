@@ -451,7 +451,7 @@
         // Reemplaza estos valores con tu Project URL y tu clave 'anon' de Supabase.
         // Los encuentras en la consola de Supabase > Project Settings > API.
         const SUPABASE_URL = 'https://ppndbzzzwhvoafzqxgbd.supabase.co'; // Tu Project URL
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwbmRienp6d2h2b2FmenF4Z2JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc3ODA5MjYsImV4cCI6MjA2MzM1NjkyNn0.NMLbuKhzYQKEGqAt2WmUXu2fvTelnrL2Wiz342D3Cd4'; // Tu clave 'anon'
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwbmRienp6d2h2b2FmenF4Z2JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc3ODA5MjYsImexpxcCI6MjA2MzM1NjkyNn0.NMLbuKhzYQKEGqAt2WmUXu2fvTelnrL2Wiz342D3Cd4'; // Tu clave 'anon'
 
         // Inicializar Supabase Client
         // NOTA: Se ha renombrado la variable a 'supabaseClient' para evitar conflictos
@@ -803,6 +803,9 @@
                     fechaIngreso: document.getElementById('new-fechaIngreso').value || null,
                     edad: parseInt(document.getElementById('new-edad').value) || null,
                     genero: document.getElementById('new-genero').value,
+                    // Para que los campos de visión acepten cualquier tipo de valor (números, caracteres, "20/20", etc.),
+                    // es CRÍTICO que las columnas correspondientes en tu tabla de Supabase sean de tipo TEXT.
+                    // Si son NUMERIC o REAL y envías caracteres no numéricos, obtendrás errores.
                     oi_esferico: document.getElementById('new-oi-esferico').value,
                     od_esferico: document.getElementById('new-od-esferico').value,
                     oi_cilindrico: document.getElementById('new-oi-cilindrico').value,
@@ -849,6 +852,9 @@
                         fechaIngreso: document.getElementById('fechaIngreso').value || null,
                         edad: parseInt(document.getElementById('edad').value) || null,
                         genero: document.getElementById('genero').value,
+                        // Para que los campos de visión acepten cualquier tipo de valor (números, caracteres, "20/20", etc.),
+                        // es CRÍTICO que las columnas correspondientes en tu tabla de Supabase sean de tipo TEXT.
+                        // Si son NUMERIC o REAL y envías caracteres no numéricos, obtendrás errores.
                         oi_esferico: document.getElementById('oi-esferico').value,
                         od_esferico: document.getElementById('od-esferico').value,
                         oi_cilindrico: document.getElementById('oi-cilindrico').value,
